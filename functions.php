@@ -21,6 +21,7 @@ class jarvis_functions{
 
     public 
         $chat_id=NULL,
+        $user_details=NULL,
         $user_id,
         $update_id,
         $msg_id=NULL,
@@ -55,7 +56,7 @@ class jarvis_functions{
      * -1 if error occured else json string 
      */
     private function curl_handler($parameter, $URL = API_URL){
-
+        
         empty($parameter) && $parameter = array(); //declare an empty array if $parameter is empty
         
         if(!is_array($parameter)){
@@ -173,7 +174,20 @@ class jarvis_functions{
         }
         
         return $return_code;
-    }    
+    }
+    public function edit_media($msgId, $type, $file_id, $caption='', $reply_markup='', $inline_msg_id=''){
+        return $this->execute([
+            'method'=>'editMessageMedia',
+            'message_id'=>$msgId,
+            'media'=>[
+                'type'=>$type,
+                'media'=>$file_id,
+                'caption'=>$caption
+            ],
+            'reply_markup'=>$reply_markup,
+            'inline_message_id'=>$inline_msg_id
+        ]);
+    }
     /**
      * Edit messages sent by the bot.
      * 
@@ -196,17 +210,16 @@ class jarvis_functions{
     {
 
         $result = $this->execute([
-            'method'=>'editmessagetext',
+            'method'=>'editMessageText',
             'message_id'=>$msgId,
             'text'=>$text,
             'reply_markup'=> $reply_markup,
             'inline_message_id'=>$inline_msg_id,
             'disable_webpage_preview'=> $disable_web_preview
         ]+$this->PMHTML);
-        if($result === -1){
-            $this->send_message('can\'t edit old messages');
-        }
-        return $result;
+
+        
+        return $result == -1 ? $this->e(-1, ''): 1;
     }
     /**
      * Edit message reply markup
@@ -221,8 +234,8 @@ class jarvis_functions{
      */
     public function editMsgReplyMarkup(
         $msgId,
-        $reply_markup=null,
-        $inline_msg_id=null)
+        $reply_markup="",
+        $inline_msg_id="")
     {
 
         return $this->execute([
@@ -248,7 +261,7 @@ class jarvis_functions{
      */
     public function edit_msg_caption(
         $caption,
-        $reply_markup=null,
+        $reply_markup="",
         $inline_msg_id=null)
     {
         return $this->execute([
@@ -312,8 +325,8 @@ class jarvis_functions{
             'method'=>'copymessage',
             'from_chat_id'=>$from_chat,
             'message_id'=>$src_msg_id,
-            'capiton'=>$caption,
-            'reply_to_message_id'=>$reply_to_original_msg == true && $this->msg_id,
+            'caption'=>$caption,
+            'reply_to_message_id'=>$reply_to_original_msg == true && MSGARR['message_id'],
             'allow_sending_without_reply'=>true,
             'disable_notification'=>!($send_notification),
             'reply_markup'=>$reply_markup
@@ -493,7 +506,21 @@ class jarvis_functions{
     public function logUser($user_id){
         global $cricdb;
         $this->chat_id = $user_id;
-        $isRegistered = $cricdb->check_data(USER_TABLE_NAME, USERID_COL_NAME, $user_id, 'd');
+        $sql = 'SELECT * FROM TGUSER_TABLE_3J WHERE CHAT_ID=?';
+        $arr = [[&$user_id,'i']];
+        if($cricdb->prepare($sql, $arr) === -1){return -1;}else{
+            if($cricdb->num_rows == 1){
+                $isRegistered = 1;
+                $details = $cricdb->fetch();
+                if(gettype($details) !='array'){
+                    return $this->e(-1, $details);
+                }
+                $this->user_details = $details;
+            }else{
+                $isRegistered = 0;
+            }
+        }
+        
         if($isRegistered === 1){
             $this->islogged = 1;
             return 1;
@@ -525,7 +552,12 @@ class jarvis_functions{
             [&$fn,'s'],
             [&$date,'s']
         ];
-        
+        $this->user_details = [
+            'fname'=>$fn,
+            'username'=>$un,
+            'balance'=>0,
+            'joining_date'=>$date
+        ];
         if($cricdb->prepare($sql, $arr) === -1){return -1;}
         $cricdb->query("SELECT COUNT(*) AS TOTAL FROM TGUSER_TABLE_3J;");
         $data = $cricdb->fetch_data();
