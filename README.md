@@ -1,4 +1,4 @@
-# tg-bot-module
+# Telegram Bot wrapper
  Ease your telegram bot development process by using the methods available in this module.
 
 ## Getting started
